@@ -1,0 +1,167 @@
+---
+title: "Assignment"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+
+```{r}
+# 1# Load the data (i.e. read.csv())
+
+
+activity <- read.csv("C:/Users/user/Documents/repdata-data-activity/activity.csv", header = TRUE, stringsAsFactors = FALSE)
+
+# 2# Process/transform the data (if necessary) into a format suitable for your analysis
+activity$steps <- as.numeric(activity$steps)
+activity$date <- as.Date(activity$date, "%Y-%m-%d")
+
+# str(activity)
+summary(activity)
+```
+
+What is mean total number of steps taken per day?
+
+```{r, echo=TRUE}
+# For this part of the assignment, you can ignore the missing values in the dataset.
+library(plyr)
+sum <- ddply(activity, .(date), summarize, sumSteps = sum(steps, na.rm = TRUE))
+
+
+# 1# Make a histogram of the total number of steps taken each day
+library(ggplot2)
+p <- ggplot(sum, aes(x = sumSteps)) + theme_bw()
+p <- p + geom_histogram(fill = "lightblue", colour = "black")
+p <- p + ggtitle("Frequency of Daily Steps got in 2 Month")
+p
+
+```
+
+Calculate and report the mean and median total number of steps taken per day
+```{r,echo=TRUE}
+meanSteps <- mean(sum$sumSteps, na.rm = TRUE)
+medianSteps <- median(sum$sumSteps, na.rm = TRUE)
+
+paste("The mean is", round(meanSteps, 2))
+
+
+```
+
+What is the average daily activity pattern 
+
+```{r,echo=TRUE}
+##    Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+days <- length(unique(activity$date)) # compute number of days in sample
+sum <- ddply(activity, .(interval), summarize,   # aggregate the steps per interval
+             sumSteps = sum(steps, na.rm = TRUE))
+sum$meanInterval <- sum$sumSteps / days # Compute mean per interval
+
+p <- ggplot(sum, aes(x = interval, y = meanInterval)) + theme_bw() 
+p <- p + geom_line()
+p <- p + ggtitle("Average Daily Steps at every 5 min")
+p <- p + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+p <- p + xlab("Time Interval - 00:00")
+p <- p + scale_x_continuous(breaks = seq(0, 2400, by = 100))
+p
+```
+
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps
+```{r,echo=TRUE}
+maxInterval <- sum[sum$meanInterval == max(sum$meanInterval), c(1, 3)]  # Compute max intervals
+maxInterval
+```
+
+Imputing missing values
+```{r,echo=TRUE}
+### Note that there are a number of days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into
+### some calculations or summaries of the data.
+
+## Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+c <- sum(is.na(activity$steps))
+paste("Number of a 5-min intervals missing from the data-set", c)
+
+```
+
+Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, 
+
+```{r,echo=TRUE}
+paste("My strategy is to replace it with the daily mean. I replace the N/As in the newly created set")
+
+```
+
+Create a new dataset that is equal to the original dataset but with the missing data filled in
+
+```{r,echo=TRUE}
+activity_new <- activity
+activity_new[is.na(activity$steps), ]$steps <- (meanSteps/288)  # Average per 5min inteval
+
+```
+Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps
+```{r,echo=TRUE}
+sumN <- ddply(activity_new, .(date), summarize, sumNSteps = sum(steps, na.rm = TRUE))
+
+# 1# Make a histogram of the total number of steps taken each day
+p <- ggplot(sumN, aes(x = sumNSteps)) + theme_bw()
+p <- p + geom_histogram(fill = "lightblue", colour = "black")
+p <- p + ggtitle("Frequency of Daily Steps taken in 2 Month - NAs fill with Dialy Mean")
+p
+
+```
+
+
+```{r,echo=TRUE}
+meanNSteps <- mean(sumN$sumNSteps, na.rm = TRUE)
+medianNSteps <- median(sumN$sumNSteps, na.rm = TRUE)
+
+paste("Mean filled NAs is", round(meanNSteps, 2))
+
+```
+
+
+```{r,echo=TRUE}
+paste("Median filled NAs is", round(medianNSteps, 2))
+
+```
+
+```{r,echo=TRUE}
+paste("The difference in means is", round(meanNSteps, 2) - round(meanSteps, 2))
+```
+
+```{r,echo=TRUE}
+paste("The difference in medians is", round(medianNSteps, 2) - round(medianSteps, 2))
+
+```
+
+Are there differences in activity patterns between weekdays and weekends?
+```{r,echo=TRUE}
+### For this part the weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+
+str(activity_new)
+```
+
+```{r,echo=TRUE}
+activity_new$isWeekday <- as.factor(ifelse(weekdays(activity_new$date) %in% c("Saturday", "Sunday"), "Weekday", "Weekends"))
+
+```
+
+Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). The plot should look something like the following, which was creating using simulated data:
+
+```{r,echo=TRUE}
+
+days <- length(unique(activity$date)) # compute number of days in sample
+sumN <- ddply(activity_new, .(interval, isWeekday), summarize,   # aggregate the steps per interval by isWeekday
+             sumNSteps = sum(steps, na.rm = TRUE))
+sumN$meanNInterval <- sumN$sumNSteps / days # Compute mean per interval
+
+p <- ggplot(sumN, aes(x = interval, y = meanNInterval)) + theme_bw() 
+p <- p + geom_line()
+p <- p + ggtitle("Average Daily Steps at every 5 min")
+p <- p + theme(axis.text.x = element_text(angle = 60, hjust = 1))
+p <- p + facet_wrap(~ isWeekday)
+p <- p + xlab("Time Interval - 00:00")
+p <- p + scale_x_continuous(breaks = seq(0, 2400, by = 100))
+p
+
+```
+
